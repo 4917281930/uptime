@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network Uptime Monitor | killerwhales_user</title>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;600&family=Syncopate:wght@400;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg: #050505;
+            --text-main: #ffffff;
+            --text-muted: #888888;
+            --accent: #ffffff;
+            --glass: rgba(255, 255, 255, 0.03);
+            --border: rgba(255, 255, 255, 0.08);
+            --green: #4ade80;
+            --red: #ff0044;
+            --yellow: #ffaa00;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text-main);
+            font-family: 'Manrope', sans-serif;
+            overflow-x: hidden;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* --- BACKGROUND EFFECTS --- */
+        .ambient-light {
+            position: fixed;
+            top: 50%; left: 50%;
+            width: 150vw; height: 150vw;
+            background: radial-gradient(circle, rgba(60, 20, 180, 0.15) 0%, rgba(0,0,0,0) 60%);
+            transform: translate(-50%, -50%);
+            z-index: -2;
+            animation: pulse-light 10s infinite alternate;
+        }
+
+        .noise-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.04'/%3E%3C/svg%3E");
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        /* --- LAYOUT --- */
+        .wrapper {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 4rem 2rem;
+            width: 100%;
+            position: relative;
+            z-index: 2;
+            flex: 1;
+        }
+
+        /* --- HEADER --- */
+        nav {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 6rem;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 1.5rem;
+        }
+
+        .brand {
+            font-family: 'Syncopate', sans-serif;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-size: 1.2rem;
+        }
+
+        .live-indicator {
+            display: flex; align-items: center; gap: 12px;
+            font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted);
+        }
+        .pulse-dot { 
+            width: 8px; height: 8px; 
+            background: var(--green); 
+            border-radius: 50%; 
+            box-shadow: 0 0 12px var(--green);
+            animation: pulse-glow 2s infinite;
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(1.1); }
+        }
+
+        /* --- HERO SECTION --- */
+        .hero {
+            margin-bottom: 4rem;
+        }
+
+        h1 {
+            font-family: 'Manrope', sans-serif;
+            font-weight: 300;
+            font-size: clamp(2.5rem, 5vw, 4rem);
+            line-height: 1.1;
+            letter-spacing: -1px;
+            background: linear-gradient(to right, #fff, #888);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 1rem;
+        }
+
+        .hero-desc {
+            font-size: 1rem; 
+            color: var(--text-muted); 
+            line-height: 1.8;
+            max-width: 600px;
+        }
+
+        /* --- STATS BAR --- */
+        .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1px;
+            background: var(--border);
+            border: 1px solid var(--border);
+            margin-bottom: 3rem;
+        }
+
+        .stat-item {
+            background: var(--bg);
+            padding: 2rem;
+            text-align: center;
+            transition: background 0.3s;
+        }
+
+        .stat-item:hover {
+            background: #0a0a0a;
+        }
+
+        .stat-label {
+            font-family: 'Syncopate', sans-serif;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        .stat-value.green { color: var(--green); }
+        .stat-value.red { color: var(--red); }
+
+        /* --- SECTION HEADERS --- */
+        .section-header {
+            font-family: 'Syncopate', sans-serif;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--text-muted);
+            margin: 3rem 0 1.5rem 0;
+            padding-bottom: 0.8rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .section-header:first-of-type {
+            margin-top: 0;
+        }
+
+        .empty-state {
+            background: var(--bg);
+            padding: 4rem 2.5rem;
+            text-align: center;
+            border: 1px dashed var(--border);
+        }
+
+        .empty-state-text {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* --- NETWORK CARDS --- */
+        .networks-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 1px;
+            background: var(--border);
+            border: 1px solid var(--border);
+        }
+
+        .network-card {
+            background: var(--bg);
+            padding: 2.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            transition: background 0.4s, transform 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .network-card:hover {
+            background: #0a0a0a;
+            transform: translateY(-2px);
+        }
+
+        .network-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 2px;
+            background: var(--green);
+            transform: scaleX(0);
+            transform-origin: left;
+            transition: transform 0.4s ease;
+        }
+
+        .network-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .network-card.offline::before {
+            background: var(--red);
+        }
+
+        .network-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .network-name {
+            font-family: 'Syncopate', sans-serif;
+            font-size: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .status-badge {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            padding: 0.4rem 0.8rem;
+            border-radius: 2px;
+            font-weight: 600;
+        }
+
+        .status-badge.online {
+            background: rgba(0, 255, 136, 0.1);
+            color: var(--green);
+            border: 1px solid rgba(0, 255, 136, 0.3);
+        }
+
+        .status-badge.offline {
+            background: rgba(255, 0, 68, 0.1);
+            color: var(--red);
+            border: 1px solid rgba(255, 0, 68, 0.3);
+        }
+
+        .status-badge.degraded {
+            background: rgba(255, 170, 0, 0.1);
+            color: var(--yellow);
+            border: 1px solid rgba(255, 170, 0, 0.3);
+        }
+
+        .network-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .detail-item {
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+        }
+
+        .detail-label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .detail-value {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        .uptime-bar {
+            display: flex;
+            gap: 2px;
+            width: 100%;
+            height: 40px;
+            margin-top: 1rem;
+        }
+
+        .uptime-block {
+            flex: 1;
+            background: var(--green);
+            border-radius: 2px;
+            transition: background 0.3s, transform 0.2s;
+        }
+
+        .uptime-block:hover {
+            transform: scaleY(1.1);
+        }
+
+        .uptime-block.down {
+            background: var(--red);
+        }
+
+        .uptime-block.degraded {
+            background: var(--yellow);
+        }
+
+        /* --- FOOTER --- */
+        footer {
+            border-top: 1px solid var(--border);
+            padding: 2rem;
+            text-align: center;
+            font-size: 0.75rem;
+            color: #333;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-top: 4rem;
+        }
+
+        /* --- ANIMATIONS --- */
+        @keyframes pulse-light {
+            0% { transform: translate(-50%, -50%) scale(1); opacity: 0.1; }
+            100% { transform: translate(-50%, -50%) scale(1.1); opacity: 0.2; }
+        }
+
+        .fade-in {
+            opacity: 0;
+            transform: translateY(20px);
+            animation: fadeUp 1s ease forwards;
+        }
+
+        .delay-1 { animation-delay: 0.2s; }
+        .delay-2 { animation-delay: 0.4s; }
+        .delay-3 { animation-delay: 0.6s; }
+
+        @keyframes fadeUp {
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* --- RESPONSIVE --- */
+        @media (max-width: 768px) {
+            h1 { font-size: 2rem; }
+            .wrapper { padding: 2rem 1.5rem; }
+            nav { margin-bottom: 3rem; }
+            .networks-grid { grid-template-columns: 1fr; }
+            .network-card { padding: 2rem; }
+            .network-details { grid-template-columns: 1fr; }
+            .stats-bar { grid-template-columns: 1fr 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="noise-overlay"></div>
+    <div class="ambient-light"></div>
+
+    <div class="wrapper">
+        
+        <nav class="fade-in">
+            <div class="brand">killerwhales_user</div>
+            <div class="live-indicator">
+                <div class="pulse-dot"></div>
+                Live Monitoring
+            </div>
+        </nav>
+
+        <section class="hero fade-in delay-1">
+            <h1>Network Uptime Monitor</h1>
+            <p class="hero-desc">
+                Real-time monitoring of validator infrastructure across multiple blockchain networks. 
+                Data refreshes automatically every 30 seconds.
+            </p>
+        </section>
+
+        <section class="stats-bar fade-in delay-2">
+            <div class="stat-item">
+                <div class="stat-label">Total Networks</div>
+                <div class="stat-value" id="totalNetworks">5</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Online</div>
+                <div class="stat-value green" id="onlineNetworks">5</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Offline</div>
+                <div class="stat-value red" id="offlineNetworks">0</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Avg Uptime</div>
+                <div class="stat-value" id="avgUptime">99.9%</div>
+            </div>
+        </section>
+
+        <section class="fade-in delay-3">
+            <h2 class="section-header">Mainnet</h2>
+            <div class="networks-grid" id="mainnetGrid">
+                <!-- Mainnet cards will be inserted here -->
+            </div>
+
+            <h2 class="section-header">Testnet</h2>
+            <div class="networks-grid" id="testnetGrid">
+                <!-- Testnet cards will be inserted here -->
+            </div>
+
+            <h2 class="section-header">Pending Networks</h2>
+            <div class="networks-grid" id="pendingGrid">
+                <!-- Pending network cards will be inserted here -->
+            </div>
+        </section>
+
+    </div>
+
+    <footer>
+        KILLERWHALES_USER INFRASTRUCTURE © 2025
+    </footer>
+
+    <script>
+        // Network data organized by type
+        const mainnetNetworks = [
+            { name: 'Paxi Network', status: 'online', uptime: 99.98, blockHeight: '18234567', responseTime: '12ms' },
+            { name: 'BitBadgesChain', status: 'online', uptime: 99.95, blockHeight: '15678234', responseTime: '8ms' },
+            { name: 'Lava Network', status: 'online', uptime: 99.92, blockHeight: '19234890', responseTime: '15ms' }
+        ];
+
+        const testnetNetworks = [
+            { name: 'Lumera Network', status: 'online', uptime: 99.88, blockHeight: '28456123', responseTime: '10ms' },
+            { name: 'Empeiria Network', status: 'online', uptime: 99.97, blockHeight: '98765432', responseTime: '7ms' }
+        ];
+
+        const pendingNetworks = [
+            { name: 'Kiichain Network' },
+            { name: 'Warden Network' }
+        ];
+
+        function renderNetworks() {
+            const allNetworks = [...mainnetNetworks, ...testnetNetworks];
+            
+            // Render mainnet
+            renderGrid('mainnetGrid', mainnetNetworks);
+            
+            // Render testnet
+            renderGrid('testnetGrid', testnetNetworks);
+            
+            // Render pending
+            renderGrid('pendingGrid', pendingNetworks);
+
+            // Update stats based on all networks
+            const onlineCount = allNetworks.filter(n => n.status === 'online').length;
+            const offlineCount = allNetworks.filter(n => n.status === 'offline').length;
+            const avgUptime = allNetworks.length > 0 
+                ? (allNetworks.reduce((sum, n) => sum + n.uptime, 0) / allNetworks.length).toFixed(1)
+                : '0.0';
+
+            document.getElementById('totalNetworks').textContent = allNetworks.length;
+            document.getElementById('onlineNetworks').textContent = onlineCount;
+            document.getElementById('offlineNetworks').textContent = offlineCount;
+            document.getElementById('avgUptime').textContent = avgUptime + '%';
+        }
+
+        function renderGrid(gridId, networks) {
+            const grid = document.getElementById(gridId);
+            grid.innerHTML = '';
+
+            networks.forEach(network => {
+                const card = document.createElement('div');
+                
+                // Check if this is a pending network (no status/uptime data)
+                if (!network.status) {
+                    card.className = 'network-card';
+                    card.innerHTML = `
+                        <div class="network-header">
+                            <div class="network-name">${network.name}</div>
+                            <div class="status-badge degraded">Pending</div>
+                        </div>
+                    `;
+                } else {
+                    card.className = `network-card ${network.status}`;
+                    
+                    // Generate 90 blocks for uptime visualization (representing ~90 days)
+                    const uptimeBlocks = generateUptimeBlocks(90, network.uptime);
+                    
+                    card.innerHTML = `
+                        <div class="network-header">
+                            <div class="network-name">${network.name}</div>
+                            <div class="status-badge ${network.status}">${network.status}</div>
+                        </div>
+                        
+                        <div class="network-details">
+                            <div class="detail-item">
+                                <div class="detail-label">Uptime</div>
+                                <div class="detail-value">${network.uptime.toFixed(2)}%</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="detail-label">Response</div>
+                                <div class="detail-value">${network.responseTime}</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="detail-label">Block Height</div>
+                                <div class="detail-value">${network.blockHeight}</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="detail-label">Last Check</div>
+                                <div class="detail-value">Just now</div>
+                            </div>
+                        </div>
+                        
+                        <div class="uptime-bar">
+                            ${uptimeBlocks}
+                        </div>
+                    `;
+                }
+                
+                grid.appendChild(card);
+            });
+        }
+
+        function generateUptimeBlocks(count, uptimePercentage) {
+            let blocks = '';
+            const downCount = Math.floor(count * (1 - uptimePercentage / 100));
+            
+            for (let i = 0; i < count; i++) {
+                // Randomly distribute downtime blocks
+                const isDown = i < downCount && Math.random() > 0.7;
+                const className = isDown ? 'uptime-block down' : 'uptime-block';
+                blocks += `<div class="${className}"></div>`;
+            }
+            
+            return blocks;
+        }
+
+        // Initial render
+        renderNetworks();
+
+        // Simulate real-time updates every 30 seconds
+        setInterval(() => {
+            // Add small random variations to simulate live data
+            [...mainnetNetworks, ...testnetNetworks].forEach(network => {
+                if (network.status === 'online') {
+                    const variation = (Math.random() - 0.5) * 0.02;
+                    network.uptime = Math.min(100, Math.max(95, network.uptime + variation));
+                    network.responseTime = Math.max(5, Math.floor(parseFloat(network.responseTime) + (Math.random() - 0.5) * 3)) + 'ms';
+                }
+            });
+            renderNetworks();
+        }, 30000);
+    </script>
+
+</body>
+</html>
